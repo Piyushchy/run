@@ -9,6 +9,7 @@ public class PlayerController : MonoBehaviour
     public Transform cameraRig;
     public Transform centerEyeAnchor;
     public LaneManager laneManager;
+    public Animator animator;
 
     [Header("Forward Speed")]
     public float startSpeed = 5f;
@@ -25,6 +26,9 @@ public class PlayerController : MonoBehaviour
     [Header("Duck / Roll")]
     public float duckThreshold = -0.15f;
     public float rollDuration = 0.5f;
+
+    [Header("Positioning")]
+    public float forwardOffset = 2f; // Distance in front of camera
 
     // ── private state ──────────────────────────────────────
     private Rigidbody rb;
@@ -64,13 +68,24 @@ public class PlayerController : MonoBehaviour
         HandleDuck();
         RampSpeed();
         SmoothLane();
+        GameManager.Instance.currentSpeed = currentSpeed; // Update speed for scoring
+        if (animator) animator.SetFloat("Speed", currentSpeed / maxSpeed); // Normalize for animation
+    }
+
+    void LateUpdate()
+    {
+        // Keep player at fixed offset in front of camera
+        Vector3 targetPos = cameraRig.position + cameraRig.forward * forwardOffset;
+        targetPos.x = transform.position.x; // Preserve lane x
+        targetPos.y = transform.position.y; // Preserve jump y
+        transform.position = targetPos;
     }
 
     void FixedUpdate()
     {
         if (!GameManager.Instance.IsPlaying) return;
-        rb.MovePosition(rb.position +
-            transform.forward * currentSpeed * Time.fixedDeltaTime);
+        // Removed forward movement to keep player stationary
+        // World moves instead via ObstacleSpawner
     }
 
     // ── lanes ──────────────────────────────────────────────
@@ -119,6 +134,7 @@ public class PlayerController : MonoBehaviour
         {
             rb.AddForce(Vector3.up * jumpForce, ForceMode.Impulse);
             isGrounded = false;
+            if (animator) animator.SetTrigger("Jump");
         }
 
         prevHeadY = centerEyeAnchor.localPosition.y;
@@ -143,8 +159,7 @@ public class PlayerController : MonoBehaviour
     {
         isRolling = true;
         rollTimer = rollDuration;
-        // TODO: trigger your roll animation here
-        // GetComponent<Animator>().SetTrigger("Roll");
+        if (animator) animator.SetTrigger("Roll");
         Debug.Log("ROLL triggered");
     }
 
@@ -153,6 +168,11 @@ public class PlayerController : MonoBehaviour
     {
         currentSpeed = Mathf.Min(
             currentSpeed + speedRampRate * Time.deltaTime, maxSpeed);
+    }
+
+    public float GetCurrentSpeed()
+    {
+        return currentSpeed;
     }
 
     // ── collisions ─────────────────────────────────────────

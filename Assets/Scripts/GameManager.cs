@@ -17,8 +17,9 @@ public class GameManager : MonoBehaviour
 
     public bool IsPlaying { get; private set; } = true;
 
+    public float currentSpeed; // Updated by PlayerController
+
     private float score = 0f;
-    private Vector3 startPos;
 
     void Awake()
     {
@@ -29,14 +30,13 @@ public class GameManager : MonoBehaviour
 
     void Start()
     {
-        startPos = player.position;
         if (gameOverPanel) gameOverPanel.SetActive(false);
     }
 
     void Update()
     {
         if (!IsPlaying) return;
-        score = Vector3.Distance(startPos, player.position);
+        score += currentSpeed * Time.deltaTime;
         if (scoreText) scoreText.text = "Score: " + Mathf.FloorToInt(score);
     }
 

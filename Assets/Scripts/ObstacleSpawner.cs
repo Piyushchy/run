@@ -34,6 +34,19 @@ public class ObstacleSpawner : MonoBehaviour
             spawnTimer = spawnInterval;
         }
 
+        // Move obstacles backward to simulate forward motion
+        float speed = player.GetComponent<PlayerController>().GetCurrentSpeed();
+        foreach (var obs in active)
+        {
+            if (obs != null)
+                obs.transform.Translate(Vector3.back * speed * Time.deltaTime);
+        }
+
+        // Move ground backward
+        GameObject ground = GameObject.Find("Ground");
+        if (ground != null)
+            ground.transform.Translate(Vector3.back * speed * Time.deltaTime);
+
         Cleanup();
     }
 
@@ -57,7 +70,7 @@ public class ObstacleSpawner : MonoBehaviour
         for (int i = active.Count - 1; i >= 0; i--)
         {
             if (active[i] == null) { active.RemoveAt(i); continue; }
-            if (player.position.z - active[i].transform.position.z > despawnDistance)
+            if (active[i].transform.position.z < player.position.z - despawnDistance)
             {
                 Destroy(active[i]);
                 active.RemoveAt(i);
