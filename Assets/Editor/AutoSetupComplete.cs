@@ -8,20 +8,60 @@ public class AutoSetupComplete : MonoBehaviour
     [MenuItem("VR Runner/Complete Setup")]
     static void CompleteSetup()
     {
-        // Step 1: Create obstacle prefabs
+        // Step 1: Create required scene objects if missing
+        CreateSceneObject("Ground", () =>
+        {
+            GameObject ground = GameObject.CreatePrimitive(PrimitiveType.Plane);
+            ground.name = "Ground";
+            ground.transform.position = Vector3.zero;
+            ground.transform.localScale = new Vector3(3f, 1f, 100f);
+            CreateTagIfMissing("Ground");
+            ground.tag = "Ground";
+            return ground;
+        });
+
+        CreateSceneObject("Player", () =>
+        {
+            GameObject player = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+            player.name = "Player";
+            player.transform.position = new Vector3(0f, 1f, 0f);
+            Rigidbody rb = player.AddComponent<Rigidbody>();
+            rb.constraints = RigidbodyConstraints.FreezeRotation;
+            return player;
+        });
+
+        CreateSceneObject("LaneManager", () => new GameObject("LaneManager"));
+        CreateSceneObject("ObstacleSpawner", () => new GameObject("ObstacleSpawner"));
+        CreateSceneObject("GameManager", () => new GameObject("GameManager"));
+
+        // Step 2: Create obstacle prefabs
         CreateObstaclePrefabs();
 
-        // Step 2: Find and configure GameManager
+        // Step 3: Configure LaneManager
+        GameObject lmObj = GameObject.Find("LaneManager");
+        if (lmObj != null && lmObj.GetComponent<LaneManager>() == null)
+            lmObj.AddComponent<LaneManager>();
+
+        // Step 4: Configure ObstacleSpawner
+        GameObject osObj = GameObject.Find("ObstacleSpawner");
+        if (osObj != null)
+        {
+            ObstacleSpawner os = osObj.GetComponent<ObstacleSpawner>();
+            if (os == null) os = osObj.AddComponent<ObstacleSpawner>();
+            os.player = GameObject.Find("Player")?.transform;
+            os.laneManager = lmObj?.GetComponent<LaneManager>();
+            os.highObstacles = new[] { AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/HighObstacle.prefab") };
+            os.lowObstacles = new[] { AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/LowObstacle.prefab") };
+        }
+
+        // Step 5: Configure GameManager
         GameObject gmObj = GameObject.Find("GameManager");
         if (gmObj != null)
         {
             GameManager gm = gmObj.GetComponent<GameManager>();
             if (gm == null) gm = gmObj.AddComponent<GameManager>();
-            
-            Transform player = GameObject.Find("Player")?.transform;
-            if (player != null) gm.player = player;
-            
-            // Find or create score text
+            gm.player = GameObject.Find("Player")?.transform;
+
             Canvas canvas = Object.FindObjectOfType<Canvas>();
             if (canvas == null)
             {
@@ -30,66 +70,41 @@ public class AutoSetupComplete : MonoBehaviour
                 canvas.renderMode = RenderMode.ScreenSpaceOverlay;
                 canvasObj.AddComponent<GraphicRaycaster>();
             }
-            
+
             if (gm.scoreText == null)
             {
                 GameObject textObj = new GameObject("ScoreText");
                 textObj.transform.SetParent(canvas.transform);
-                textObj.transform.localPosition = new Vector3(-200, 200, 0);
+                RectTransform rect = textObj.AddComponent<RectTransform>();
+                rect.anchoredPosition = new Vector2(10, -10);
+                rect.sizeDelta = new Vector2(300, 50);
                 Text scoreText = textObj.AddComponent<Text>();
                 scoreText.text = "Score: 0";
                 scoreText.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
                 scoreText.alignment = TextAnchor.UpperLeft;
+                scoreText.color = Color.black;
                 gm.scoreText = scoreText;
             }
-            
-            Debug.Log("✓ GameManager configured");
         }
 
-        // Step 3: Configure LaneManager
-        GameObject lmObj = GameObject.Find("LaneManager");
-        if (lmObj != null && lmObj.GetComponent<LaneManager>() == null)
-            lmObj.AddComponent<LaneManager>();
-        Debug.Log("✓ LaneManager configured");
-
-        // Step 4: Configure ObstacleSpawner
-        GameObject osObj = GameObject.Find("ObstacleSpawner");
-        if (osObj != null)
-        {
-            ObstacleSpawner os = osObj.GetComponent<ObstacleSpawner>();
-            if (os == null) os = osObj.AddComponent<ObstacleSpawner>();
-            
-            os.player = GameObject.Find("Player")?.transform;
-            os.laneManager = GameObject.Find("LaneManager")?.GetComponent<LaneManager>();
-            
-            // Load obstacle prefabs
-            os.highObstacles = new[] { AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/HighObstacle.prefab") };
-            os.lowObstacles = new[] { AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/LowObstacle.prefab") };
-            
-            Debug.Log("✓ ObstacleSpawner configured");
-        }
-
-        // Step 5: Configure Player and PlayerController
+        // Step 6: Configure Player and PlayerController
         GameObject playerObj = GameObject.Find("Player");
         if (playerObj != null)
         {
             PlayerController pc = playerObj.GetComponent<PlayerController>();
             if (pc == null) pc = playerObj.AddComponent<PlayerController>();
-            
-            // Try to find XR rig first, fallback to Main Camera
+            pc.laneManager = lmObj?.GetComponent<LaneManager>();
+
             Transform cameraRig = null;
             Transform eyeAnchor = null;
-            
             GameObject xrRig = GameObject.Find("XR Rig") ?? GameObject.Find("OVRCameraRig");
             if (xrRig != null)
             {
                 cameraRig = xrRig.transform;
-                eyeAnchor = xrRig.transform.Find("CenterEyeAnchor") ?? 
-                            xrRig.transform.Find("TrackingSpace/CenterEyeAnchor");
+                eyeAnchor = xrRig.transform.Find("CenterEyeAnchor") ?? xrRig.transform.Find("TrackingSpace/CenterEyeAnchor");
             }
             else
             {
-                // Fallback to Main Camera
                 Camera mainCam = Camera.main;
                 if (mainCam != null)
                 {
@@ -97,22 +112,16 @@ public class AutoSetupComplete : MonoBehaviour
                     cameraRig = mainCam.transform.parent ?? mainCam.transform;
                 }
             }
-            
+
             if (cameraRig != null) pc.cameraRig = cameraRig;
             if (eyeAnchor != null) pc.centerEyeAnchor = eyeAnchor;
-            
-            pc.laneManager = GameObject.Find("LaneManager")?.GetComponent<LaneManager>();
-            
-            Debug.Log("✓ Player and PlayerController configured");
         }
 
-        // Step 6: Ensure all tags exist
+        // Step 7: Ensure tags exist
         CreateTagIfMissing("Ground");
         CreateTagIfMissing("Obstacle");
-
-        // Tag the ground
-        GameObject ground = GameObject.Find("Ground");
-        if (ground != null) ground.tag = "Ground";
+        GameObject groundObj = GameObject.Find("Ground");
+        if (groundObj != null) groundObj.tag = "Ground";
 
         EditorUtility.DisplayDialog(
             "Setup Complete!",
@@ -126,6 +135,15 @@ public class AutoSetupComplete : MonoBehaviour
             "Start Testing!");
 
         AssetDatabase.Refresh();
+    }
+
+    static void CreateSceneObject(string name, System.Func<GameObject> createFunc)
+    {
+        if (GameObject.Find(name) == null)
+        {
+            createFunc();
+            Debug.Log($"✓ {name} created");
+        }
     }
 
     static void CreateObstaclePrefabs()

@@ -114,8 +114,17 @@ public class PlayerController : MonoBehaviour
     // ── lanes ──────────────────────────────────────────────
     void HandleLaneInput()
     {
-        InputDevices.GetDeviceAtXRNode(XRNode.LeftHand)
-            .TryGetFeatureValue(CommonUsages.primary2DAxis, out Vector2 stick);
+        Vector2 stick = Vector2.zero;
+        bool gotStick = InputDevices.GetDeviceAtXRNode(XRNode.LeftHand)
+            .TryGetFeatureValue(CommonUsages.primary2DAxis, out stick);
+
+        if (!gotStick)
+        {
+            if (Input.GetKeyDown(KeyCode.A) || Input.GetKeyDown(KeyCode.LeftArrow))
+                stick.x = -1f;
+            else if (Input.GetKeyDown(KeyCode.D) || Input.GetKeyDown(KeyCode.RightArrow))
+                stick.x = 1f;
+        }
 
         if (stick.x < -0.5f && currentLane > 0)
         {
@@ -147,6 +156,9 @@ public class PlayerController : MonoBehaviour
         InputDevices.GetDeviceAtXRNode(XRNode.RightHand)
             .TryGetFeatureValue(CommonUsages.primaryButton, out btnJump);
 
+        if (Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.W) || Input.GetKeyDown(KeyCode.UpArrow))
+            btnJump = true;
+
         if (headCalibrated)
         {
             float delta = centerEyeAnchor.localPosition.y - prevHeadY;
@@ -160,16 +172,27 @@ public class PlayerController : MonoBehaviour
             if (animator) animator.SetTrigger("Jump");
         }
 
-        prevHeadY = centerEyeAnchor.localPosition.y;
+        if (centerEyeAnchor != null)
+            prevHeadY = centerEyeAnchor.localPosition.y;
     }
 
     // ── duck / roll ────────────────────────────────────────
     void HandleDuck()
     {
-        if (!headCalibrated || isRolling) return;
+        if (isRolling) return;
 
-        float drop = centerEyeAnchor.localPosition.y - standingHeadY;
-        if (drop < duckThreshold) StartRoll();
+        bool didDuck = false;
+        if (centerEyeAnchor != null && headCalibrated)
+        {
+            float drop = centerEyeAnchor.localPosition.y - standingHeadY;
+            didDuck = drop < duckThreshold;
+        }
+
+        if (Input.GetKeyDown(KeyCode.S) || Input.GetKeyDown(KeyCode.DownArrow) || Input.GetKeyDown(KeyCode.LeftControl) || Input.GetKeyDown(KeyCode.RightControl))
+            didDuck = true;
+
+        if (didDuck)
+            StartRoll();
 
         if (isRolling)
         {
