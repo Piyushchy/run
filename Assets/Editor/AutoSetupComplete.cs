@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEditor;
+using UnityEngine.UI;
 using System.IO;
 
 public class AutoSetupComplete : MonoBehaviour
