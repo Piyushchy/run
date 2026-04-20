@@ -1,0 +1,67 @@
+using UnityEngine;
+using System.Collections.Generic;
+
+// Attach to the ObstacleSpawner empty GameObject.
+// Drag obstacle prefabs into the Inspector arrays.
+public class ObstacleSpawner : MonoBehaviour
+{
+    [Header("References")]
+    public Transform player;
+    public LaneManager laneManager;
+
+    [Header("Obstacle Prefabs")]
+    public GameObject[] highObstacles;  // player must DUCK
+    public GameObject[] lowObstacles;   // player must JUMP
+
+    [Header("Spawn Settings")]
+    public float spawnDistance = 30f;
+    public float despawnDistance = 10f;
+    public float spawnInterval = 2f;
+    public float minInterval = 0.5f;
+
+    private float spawnTimer = 0f;
+    private List<GameObject> active = new List<GameObject>();
+
+    void Update()
+    {
+        if (!GameManager.Instance.IsPlaying) return;
+
+        spawnTimer -= Time.deltaTime;
+        if (spawnTimer <= 0f)
+        {
+            SpawnObstacle();
+            spawnInterval = Mathf.Max(spawnInterval - 0.01f, minInterval);
+            spawnTimer = spawnInterval;
+        }
+
+        Cleanup();
+    }
+
+    void SpawnObstacle()
+    {
+        int lane = Random.Range(0, 3);
+        float x = laneManager.GetLaneX(lane);
+        bool high = Random.value > 0.5f;
+
+        GameObject[] pool = high ? highObstacles : lowObstacles;
+        if (pool == null || pool.Length == 0) return;
+
+        GameObject prefab = pool[Random.Range(0, pool.Length)];
+        Vector3 pos = new Vector3(x, 0f, player.position.z + spawnDistance);
+
+        active.Add(Instantiate(prefab, pos, Quaternion.identity));
+    }
+
+    void Cleanup()
+    {
+        for (int i = active.Count - 1; i >= 0; i--)
+        {
+            if (active[i] == null) { active.RemoveAt(i); continue; }
+            if (player.position.z - active[i].transform.position.z > despawnDistance)
+            {
+                Destroy(active[i]);
+                active.RemoveAt(i);
+            }
+        }
+    }
+}
