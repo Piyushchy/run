@@ -41,13 +41,8 @@ public class ObstacleSpawner : MonoBehaviour
         foreach (var obs in active)
         {
             if (obs != null)
-                obs.transform.Translate(Vector3.back * speed * Time.deltaTime);
+                obs.transform.Translate(Vector3.back * speed * Time.deltaTime, Space.World);
         }
-
-        // Move ground backward
-        GameObject ground = GameObject.Find("Ground");
-        if (ground != null)
-            ground.transform.Translate(Vector3.back * speed * Time.deltaTime);
 
         Cleanup();
     }

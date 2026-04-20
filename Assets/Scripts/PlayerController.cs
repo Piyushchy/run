@@ -18,6 +18,7 @@ public class PlayerController : MonoBehaviour
 
     [Header("Lane Movement")]
     public float laneChangeSpeed = 10f;
+    public float laneInputCooldown = 0.25f;
 
     [Header("Jump")]
     public float jumpForce = 5f;
@@ -38,6 +39,7 @@ public class PlayerController : MonoBehaviour
     private bool isGrounded = true;
     private bool isRolling = false;
     private float rollTimer = 0f;
+    private float laneInputTimer = 0f;
 
     // head tracking
     private float standingHeadY = 0f;
@@ -84,6 +86,7 @@ public class PlayerController : MonoBehaviour
     void Update()
     {
         if (!GameManager.Instance.IsPlaying) return;
+        laneInputTimer -= Time.deltaTime;
         HandleLaneInput();
         HandleJump();
         HandleDuck();
@@ -114,6 +117,8 @@ public class PlayerController : MonoBehaviour
     // ── lanes ──────────────────────────────────────────────
     void HandleLaneInput()
     {
+        if (laneInputTimer > 0f) return;
+
         Vector2 stick = Vector2.zero;
         bool gotStick = InputDevices.GetDeviceAtXRNode(XRNode.LeftHand)
             .TryGetFeatureValue(CommonUsages.primary2DAxis, out stick);
@@ -130,11 +135,13 @@ public class PlayerController : MonoBehaviour
         {
             currentLane--;
             targetX = laneManager.GetLaneX(currentLane);
+            laneInputTimer = laneInputCooldown;
         }
         else if (stick.x > 0.5f && currentLane < 2)
         {
             currentLane++;
             targetX = laneManager.GetLaneX(currentLane);
+            laneInputTimer = laneInputCooldown;
         }
     }
 
@@ -159,7 +166,7 @@ public class PlayerController : MonoBehaviour
         if (Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.W) || Input.GetKeyDown(KeyCode.UpArrow))
             btnJump = true;
 
-        if (headCalibrated)
+        if (headCalibrated && centerEyeAnchor != null)
         {
             float delta = centerEyeAnchor.localPosition.y - prevHeadY;
             headJump = delta > jumpHeightThreshold;
