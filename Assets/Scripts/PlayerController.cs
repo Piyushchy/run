@@ -9,6 +9,7 @@ public class PlayerController : MonoBehaviour
     public Transform cameraRig;
     public Transform centerEyeAnchor;
     public LaneManager laneManager;
+    public Animator animator;
 
     [Header("Forward Speed")]
     public float startSpeed = 5f;
@@ -25,6 +26,9 @@ public class PlayerController : MonoBehaviour
     [Header("Duck / Roll")]
     public float duckThreshold = -0.15f;
     public float rollDuration = 0.5f;
+
+    [Header("Positioning")]
+    public float forwardOffset = 2f; // Distance in front of camera
 
     // ── private state ──────────────────────────────────────
     private Rigidbody rb;
@@ -43,8 +47,29 @@ public class PlayerController : MonoBehaviour
     void Start()
     {
         rb = GetComponent<Rigidbody>();
+        if (rb == null) rb = gameObject.AddComponent<Rigidbody>();
         rb.constraints = RigidbodyConstraints.FreezeRotation;
+        rb.useGravity = true;
+        rb.isKinematic = false;
+        
         currentSpeed = startSpeed;
+        
+        // Fallback to Main Camera if no XR rig assigned
+        if (cameraRig == null)
+        {
+            Camera mainCam = Camera.main;
+            if (mainCam != null)
+            {
+                centerEyeAnchor = mainCam.transform;
+                cameraRig = mainCam.transform.parent ?? mainCam.transform;
+                Debug.Log("Using Main Camera for VR fallback");
+            }
+        }
+        
+        // Get LaneManager from scene if not assigned
+        if (laneManager == null)
+            laneManager = FindObjectOfType<LaneManager>();
+        
         Invoke(nameof(CalibrateHead), 1f);
     }
 
@@ -64,20 +89,42 @@ public class PlayerController : MonoBehaviour
         HandleDuck();
         RampSpeed();
         SmoothLane();
+        GameManager.Instance.currentSpeed = currentSpeed; // Update speed for scoring
+        if (animator) animator.SetFloat("Speed", currentSpeed / maxSpeed); // Normalize for animation
+    }
+
+    void LateUpdate()
+    {
+        if (cameraRig == null || centerEyeAnchor == null) return;
+        
+        // Keep player at fixed offset in front of camera
+        Vector3 targetPos = cameraRig.position + cameraRig.forward * forwardOffset;
+        targetPos.x = transform.position.x; // Preserve lane x
+        targetPos.y = transform.position.y; // Preserve jump y
+        transform.position = targetPos;
     }
 
     void FixedUpdate()
     {
         if (!GameManager.Instance.IsPlaying) return;
-        rb.MovePosition(rb.position +
-            transform.forward * currentSpeed * Time.fixedDeltaTime);
+        // Removed forward movement to keep player stationary
+        // World moves instead via ObstacleSpawner
     }
 
     // ── lanes ──────────────────────────────────────────────
     void HandleLaneInput()
     {
-        InputDevices.GetDeviceAtXRNode(XRNode.LeftHand)
-            .TryGetFeatureValue(CommonUsages.primary2DAxis, out Vector2 stick);
+        Vector2 stick = Vector2.zero;
+        bool gotStick = InputDevices.GetDeviceAtXRNode(XRNode.LeftHand)
+            .TryGetFeatureValue(CommonUsages.primary2DAxis, out stick);
+
+        if (!gotStick)
+        {
+            if (Input.GetKeyDown(KeyCode.A) || Input.GetKeyDown(KeyCode.LeftArrow))
+                stick.x = -1f;
+            else if (Input.GetKeyDown(KeyCode.D) || Input.GetKeyDown(KeyCode.RightArrow))
+                stick.x = 1f;
+        }
 
         if (stick.x < -0.5f && currentLane > 0)
         {
@@ -109,6 +156,9 @@ public class PlayerController : MonoBehaviour
         InputDevices.GetDeviceAtXRNode(XRNode.RightHand)
             .TryGetFeatureValue(CommonUsages.primaryButton, out btnJump);
 
+        if (Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.W) || Input.GetKeyDown(KeyCode.UpArrow))
+            btnJump = true;
+
         if (headCalibrated)
         {
             float delta = centerEyeAnchor.localPosition.y - prevHeadY;
@@ -119,18 +169,30 @@ public class PlayerController : MonoBehaviour
         {
             rb.AddForce(Vector3.up * jumpForce, ForceMode.Impulse);
             isGrounded = false;
+            if (animator) animator.SetTrigger("Jump");
         }
 
-        prevHeadY = centerEyeAnchor.localPosition.y;
+        if (centerEyeAnchor != null)
+            prevHeadY = centerEyeAnchor.localPosition.y;
     }
 
     // ── duck / roll ────────────────────────────────────────
     void HandleDuck()
     {
-        if (!headCalibrated || isRolling) return;
+        if (isRolling) return;
 
-        float drop = centerEyeAnchor.localPosition.y - standingHeadY;
-        if (drop < duckThreshold) StartRoll();
+        bool didDuck = false;
+        if (centerEyeAnchor != null && headCalibrated)
+        {
+            float drop = centerEyeAnchor.localPosition.y - standingHeadY;
+            didDuck = drop < duckThreshold;
+        }
+
+        if (Input.GetKeyDown(KeyCode.S) || Input.GetKeyDown(KeyCode.DownArrow) || Input.GetKeyDown(KeyCode.LeftControl) || Input.GetKeyDown(KeyCode.RightControl))
+            didDuck = true;
+
+        if (didDuck)
+            StartRoll();
 
         if (isRolling)
         {
@@ -143,8 +205,7 @@ public class PlayerController : MonoBehaviour
     {
         isRolling = true;
         rollTimer = rollDuration;
-        // TODO: trigger your roll animation here
-        // GetComponent<Animator>().SetTrigger("Roll");
+        if (animator) animator.SetTrigger("Roll");
         Debug.Log("ROLL triggered");
     }
 
@@ -155,6 +216,11 @@ public class PlayerController : MonoBehaviour
             currentSpeed + speedRampRate * Time.deltaTime, maxSpeed);
     }
 
+    public float GetCurrentSpeed()
+    {
+        return currentSpeed;
+    }
+
     // ── collisions ─────────────────────────────────────────
     void OnCollisionEnter(Collision col)
     {
@@ -162,6 +228,9 @@ public class PlayerController : MonoBehaviour
             isGrounded = true;
 
         if (col.gameObject.CompareTag("Obstacle"))
-            GameManager.Instance.TriggerGameOver();
+        {
+            if (GameManager.Instance != null)
+                GameManager.Instance.TriggerGameOver();
+        }
     }
 }
