@@ -26,6 +26,10 @@ public class GameManager : MonoBehaviour
         if (Instance != null && Instance != this)
         { Destroy(gameObject); return; }
         Instance = this;
+        
+        // Find player if not assigned
+        if (player == null)
+            player = FindObjectOfType<PlayerController>()?.transform;
     }
 
     void Start()

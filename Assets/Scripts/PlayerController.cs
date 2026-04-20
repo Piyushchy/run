@@ -47,8 +47,29 @@ public class PlayerController : MonoBehaviour
     void Start()
     {
         rb = GetComponent<Rigidbody>();
+        if (rb == null) rb = gameObject.AddComponent<Rigidbody>();
         rb.constraints = RigidbodyConstraints.FreezeRotation;
+        rb.useGravity = true;
+        rb.isKinematic = false;
+        
         currentSpeed = startSpeed;
+        
+        // Fallback to Main Camera if no XR rig assigned
+        if (cameraRig == null)
+        {
+            Camera mainCam = Camera.main;
+            if (mainCam != null)
+            {
+                centerEyeAnchor = mainCam.transform;
+                cameraRig = mainCam.transform.parent ?? mainCam.transform;
+                Debug.Log("Using Main Camera for VR fallback");
+            }
+        }
+        
+        // Get LaneManager from scene if not assigned
+        if (laneManager == null)
+            laneManager = FindObjectOfType<LaneManager>();
+        
         Invoke(nameof(CalibrateHead), 1f);
     }
 
@@ -74,6 +95,8 @@ public class PlayerController : MonoBehaviour
 
     void LateUpdate()
     {
+        if (cameraRig == null || centerEyeAnchor == null) return;
+        
         // Keep player at fixed offset in front of camera
         Vector3 targetPos = cameraRig.position + cameraRig.forward * forwardOffset;
         targetPos.x = transform.position.x; // Preserve lane x
@@ -182,6 +205,9 @@ public class PlayerController : MonoBehaviour
             isGrounded = true;
 
         if (col.gameObject.CompareTag("Obstacle"))
-            GameManager.Instance.TriggerGameOver();
+        {
+            if (GameManager.Instance != null)
+                GameManager.Instance.TriggerGameOver();
+        }
     }
 }
