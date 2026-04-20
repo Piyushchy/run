@@ -80,7 +80,9 @@ public class AutoSetupComplete : MonoBehaviour
                 rect.sizeDelta = new Vector2(300, 50);
                 Text scoreText = textObj.AddComponent<Text>();
                 scoreText.text = "Score: 0";
-                scoreText.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+                scoreText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+                if (scoreText.font == null)
+                    scoreText.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
                 scoreText.alignment = TextAnchor.UpperLeft;
                 scoreText.color = Color.black;
                 gm.scoreText = scoreText;
