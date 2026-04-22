@@ -87,6 +87,64 @@ public class AutoSetupComplete : MonoBehaviour
                 scoreText.color = Color.black;
                 gm.scoreText = scoreText;
             }
+
+            if (gm.gameOverPanel == null)
+            {
+                GameObject panelObj = new GameObject("GameOverPanel");
+                panelObj.transform.SetParent(canvas.transform);
+                RectTransform panelRect = panelObj.AddComponent<RectTransform>();
+                panelRect.anchoredPosition = Vector2.zero;
+                panelRect.sizeDelta = new Vector2(400, 200);
+                panelRect.anchorMin = new Vector2(0.5f, 0.5f);
+                panelRect.anchorMax = new Vector2(0.5f, 0.5f);
+                panelRect.pivot = new Vector2(0.5f, 0.5f);
+
+                Image panelImage = panelObj.AddComponent<Image>();
+                panelImage.color = new Color(0, 0, 0, 0.8f);
+
+                // Game Over Text
+                GameObject textObj = new GameObject("GameOverText");
+                textObj.transform.SetParent(panelObj.transform);
+                RectTransform textRect = textObj.AddComponent<RectTransform>();
+                textRect.anchoredPosition = new Vector2(0, 50);
+                textRect.sizeDelta = new Vector2(300, 50);
+                Text gameOverText = textObj.AddComponent<Text>();
+                gameOverText.text = "Game Over";
+                gameOverText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+                if (gameOverText.font == null)
+                    gameOverText.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+                gameOverText.alignment = TextAnchor.MiddleCenter;
+                gameOverText.color = Color.white;
+                gameOverText.fontSize = 36;
+
+                // Restart Button
+                GameObject buttonObj = new GameObject("RestartButton");
+                buttonObj.transform.SetParent(panelObj.transform);
+                RectTransform buttonRect = buttonObj.AddComponent<RectTransform>();
+                buttonRect.anchoredPosition = new Vector2(0, -30);
+                buttonRect.sizeDelta = new Vector2(150, 50);
+                Button restartButton = buttonObj.AddComponent<Button>();
+                Image buttonImage = buttonObj.AddComponent<Image>();
+                buttonImage.color = Color.gray;
+
+                GameObject buttonTextObj = new GameObject("ButtonText");
+                buttonTextObj.transform.SetParent(buttonObj.transform);
+                RectTransform buttonTextRect = buttonTextObj.AddComponent<RectTransform>();
+                buttonTextRect.anchoredPosition = Vector2.zero;
+                buttonTextRect.sizeDelta = new Vector2(140, 40);
+                Text buttonText = buttonTextObj.AddComponent<Text>();
+                buttonText.text = "Restart";
+                buttonText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+                if (buttonText.font == null)
+                    buttonText.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+                buttonText.alignment = TextAnchor.MiddleCenter;
+                buttonText.color = Color.black;
+
+                restartButton.onClick.AddListener(() => gm.RestartGame());
+
+                gm.gameOverPanel = panelObj;
+                panelObj.SetActive(false);
+            }
         }
 
         // Step 6: Configure Player and PlayerController
