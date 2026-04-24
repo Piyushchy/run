@@ -53,31 +53,48 @@ public class PlayerController : MonoBehaviour
         rb.constraints = RigidbodyConstraints.FreezeRotation;
         rb.useGravity = true;
         rb.isKinematic = false;
-        
+
         currentSpeed = startSpeed;
-        
-        // Fallback to Main Camera if no XR rig assigned
-        if (cameraRig == null)
-        {
-            Camera mainCam = Camera.main;
-            if (mainCam != null)
-            {
-                centerEyeAnchor = mainCam.transform;
-                cameraRig = mainCam.transform.parent ?? mainCam.transform;
-                Debug.Log("Using Main Camera for VR fallback");
-            }
-        }
-        
-        // Get LaneManager from scene if not assigned
+
         if (laneManager == null)
             laneManager = FindObjectOfType<LaneManager>();
-        
+
+        AssignDefaultCameraRig();
+
+        if (centerEyeAnchor == null)
+            Debug.LogWarning("PlayerController: No center eye anchor assigned. VR head tracking will be disabled.");
+
+        targetX = laneManager != null ? laneManager.GetLaneX(currentLane) : transform.position.x;
+
         Invoke(nameof(CalibrateHead), 1f);
+    }
+
+    void AssignDefaultCameraRig()
+    {
+        if (cameraRig != null && centerEyeAnchor != null)
+            return;
+
+        Camera mainCam = Camera.main;
+        if (mainCam == null)
+            return;
+
+        if (cameraRig == null)
+            cameraRig = mainCam.transform.parent ?? mainCam.transform;
+
+        if (centerEyeAnchor == null)
+            centerEyeAnchor = mainCam.transform;
     }
 
     void CalibrateHead()
     {
-        standingHeadY = centerEyeAnchor.localPosition.y;
+        if (centerEyeAnchor == null)
+        {
+            headCalibrated = false;
+            Debug.LogWarning("PlayerController: Cannot calibrate head because centerEyeAnchor is null.");
+            return;
+        }
+
+        standingHeadY = centerEyeAnchor.position.y;
         prevHeadY = standingHeadY;
         headCalibrated = true;
         Debug.Log("Head height calibrated: " + standingHeadY);
@@ -85,15 +102,19 @@ public class PlayerController : MonoBehaviour
 
     void Update()
     {
-        if (!GameManager.Instance.IsPlaying) return;
+        if (GameManager.Instance != null && !GameManager.Instance.IsPlaying) return;
         laneInputTimer -= Time.deltaTime;
         HandleLaneInput();
         HandleJump();
         HandleDuck();
         RampSpeed();
         SmoothLane();
-        GameManager.Instance.currentSpeed = currentSpeed; // Update speed for scoring
-        if (animator) animator.SetFloat("Speed", currentSpeed / maxSpeed); // Normalize for animation
+
+        if (GameManager.Instance != null)
+            GameManager.Instance.currentSpeed = currentSpeed; // Update speed for scoring
+
+        if (animator)
+            animator.SetFloat("Speed", currentSpeed / maxSpeed); // Normalize for animation
     }
 
     void LateUpdate()
@@ -168,7 +189,7 @@ public class PlayerController : MonoBehaviour
 
         if (headCalibrated && centerEyeAnchor != null)
         {
-            float delta = centerEyeAnchor.localPosition.y - prevHeadY;
+            float delta = centerEyeAnchor.position.y - prevHeadY;
             headJump = delta > jumpHeightThreshold;
         }
 
@@ -180,7 +201,7 @@ public class PlayerController : MonoBehaviour
         }
 
         if (centerEyeAnchor != null)
-            prevHeadY = centerEyeAnchor.localPosition.y;
+            prevHeadY = centerEyeAnchor.position.y;
     }
 
     // ── duck / roll ────────────────────────────────────────
@@ -191,7 +212,7 @@ public class PlayerController : MonoBehaviour
         bool didDuck = false;
         if (centerEyeAnchor != null && headCalibrated)
         {
-            float drop = centerEyeAnchor.localPosition.y - standingHeadY;
+            float drop = centerEyeAnchor.position.y - standingHeadY;
             didDuck = drop < duckThreshold;
         }
 

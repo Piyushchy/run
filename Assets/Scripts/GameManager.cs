@@ -24,9 +24,16 @@ public class GameManager : MonoBehaviour
     void Awake()
     {
         if (Instance != null && Instance != this)
-        { Destroy(gameObject); return; }
+        {
+            Destroy(gameObject);
+            return;
+        }
+
         Instance = this;
-        
+        Time.timeScale = 1f;
+        IsPlaying = true;
+        score = 0f;
+
         // Find player if not assigned
         if (player == null)
             player = FindObjectOfType<PlayerController>()?.transform;

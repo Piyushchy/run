@@ -22,6 +22,23 @@ public class ObstacleSpawner : MonoBehaviour
     private float spawnTimer = 0f;
     private List<GameObject> active = new List<GameObject>();
 
+    void Start()
+    {
+        if (player == null)
+            player = FindObjectOfType<PlayerController>()?.transform;
+
+        if (laneManager == null)
+            laneManager = FindObjectOfType<LaneManager>();
+
+        if (player == null)
+            Debug.LogWarning("ObstacleSpawner: Player reference not assigned and no PlayerController found in scene.");
+
+        if (laneManager == null)
+            Debug.LogWarning("ObstacleSpawner: LaneManager reference not assigned and no LaneManager found in scene.");
+
+        spawnTimer = spawnInterval;
+    }
+
     void Update()
     {
         if (GameManager.Instance == null || !GameManager.Instance.IsPlaying) return;
@@ -49,8 +66,14 @@ public class ObstacleSpawner : MonoBehaviour
 
     void SpawnObstacle()
     {
+        if (player == null)
+            player = FindObjectOfType<PlayerController>()?.transform;
+
+        if (laneManager == null)
+            laneManager = FindObjectOfType<LaneManager>();
+
         if (player == null || laneManager == null) return;
-        
+
         int lane = Random.Range(0, 3);
         float x = laneManager.GetLaneX(lane);
         bool high = Random.value > 0.5f;
@@ -76,26 +99,36 @@ public class ObstacleSpawner : MonoBehaviour
 
     void CreateObstacleOnSpot(float x, bool high)
     {
-        GameObject obs = GameObject.CreatePrimitive(high ? PrimitiveType.Cube : PrimitiveType.Cube);
+        GameObject obs = GameObject.CreatePrimitive(PrimitiveType.Cube);
         obs.name = high ? "HighObstacle" : "LowObstacle";
         obs.transform.localScale = high ? new Vector3(2f, 2f, 1f) : new Vector3(2f, 0.5f, 1f);
         obs.transform.position = new Vector3(x, high ? 2f : 0.25f, player.position.z + spawnDistance);
-        
+
         // Configure for collision
-        DestroyImmediate(obs.GetComponent<MeshCollider>());
+        var meshCollider = obs.GetComponent<MeshCollider>();
+        if (meshCollider != null)
+            Destroy(meshCollider);
+
         obs.AddComponent<BoxCollider>();
         Rigidbody rb = obs.AddComponent<Rigidbody>();
         rb.isKinematic = true;
-        
+
         obs.tag = "Obstacle";
         active.Add(obs);
     }
 
     void Cleanup()
     {
+        if (player == null) return;
+
         for (int i = active.Count - 1; i >= 0; i--)
         {
-            if (active[i] == null) { active.RemoveAt(i); continue; }
+            if (active[i] == null)
+            {
+                active.RemoveAt(i);
+                continue;
+            }
+
             if (active[i].transform.position.z < player.position.z - despawnDistance)
             {
                 Destroy(active[i]);
